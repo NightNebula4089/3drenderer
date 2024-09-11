@@ -1,10 +1,12 @@
 package renderer;
 
 import com.sun.javafx.property.adapter.PropertyDescriptor;
+import javafx.animation.PathTransition;
 import javafx.application.Application;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
 import javafx.event.EventHandler;
+import javafx.geometry.Orientation;
 import javafx.scene.Group;
 import javafx.scene.Scene;
 import javafx.scene.control.Slider;
@@ -92,18 +94,31 @@ public class Main extends Application {
     public void start(Stage stage) throws Exception {
 
         ArrayList<Triangle> tris = new ArrayList<Triangle>();
-        tris.add(new Triangle(new Vertex (100.0,100.0,100.0),new Vertex(-100.0,-100.0,100.0),new Vertex(-100.0,100.0,-100.0) , Color.YELLOW));
+        tris.add(new Triangle(new Vertex (100.0,100.0,100.0),
+                new Vertex(-100.0,-100.0,100.0),
+                new Vertex(-100.0,100.0,-100.0) , Color.YELLOW));
 
-        tris.add(new Triangle(new Vertex (100.0,100.0,100.0),new Vertex(-100.0,-100.0,100.0),new Vertex(100.0,-100.0,-100.0) , Color.RED));
+        tris.add(new Triangle(new Vertex (100.0,100.0,100.0),
+                new Vertex(-100.0,-100.0,100.0),
+                new Vertex(100.0,-100.0,-100.0) , Color.RED));
 
-        tris.add(new Triangle(new Vertex (-100.0,100.0,-100.0),new Vertex(100.0,-100.0,-100.0),new Vertex(100.0,100.0,-100.0) , Color.GREEN));
+        tris.add(new Triangle(new Vertex (-100.0,100.0,-100.0),
+                new Vertex(100.0,-100.0,-100.0),
+                new Vertex(100.0,100.0,100.0) , Color.GREEN));
 
-        tris.add(new Triangle(new Vertex (-100.0,100.0,-100.0),new Vertex(100.0,-100.0,-100.0),new Vertex(-100.0,-100.0,100.0) , Color.BLUE));
+        tris.add(new Triangle(new Vertex (-100.0,100.0,-100.0),
+                new Vertex(100.0,-100.0,-100.0),
+                new Vertex(-100.0,-100.0,100.0) , Color.BLUE));
 
         Slider scroll = new Slider(0, 10, 0);
         scroll.resizeRelocate(250.0,500.0,2.0,2.0);
         Group root = new Group();
         root.getChildren().add(scroll);
+
+        Slider scroll2 = new Slider(0,10,0);
+        scroll2.relocate(500,300);
+        scroll2.setOrientation(Orientation.VERTICAL);
+        root.getChildren().add(scroll2);
 
         for(int i = 0; i < tris.size(); i++){
             Triangle t = tris.get(i);
@@ -129,17 +144,16 @@ public class Main extends Application {
 
 
 
-
         Scene scene = new Scene(root, 600, 600, Color.WHITE);
         Stage primaryStage = new Stage();
 
         scroll.valueProperty().addListener(new ChangeListener<Number>() {
             @Override
             public void changed(ObservableValue<? extends Number> observableValue, Number number, Number t1) {
+                root.getChildren().remove(5);
                 root.getChildren().remove(4);
                 root.getChildren().remove(3);
                 root.getChildren().remove(2);
-                root.getChildren().remove(1);
                 double angle = Math.toRadians(scroll.getValue());
                 Matrix3 transform = new Matrix3(new double[] {
                         Math.cos(angle),0,-Math.sin(angle),
@@ -174,8 +188,48 @@ public class Main extends Application {
             }
         });
 
+        scroll2.valueProperty().addListener(new ChangeListener<Number>() {
+            @Override
+            public void changed(ObservableValue<? extends Number> observableValue, Number number, Number t1) {
+                root.getChildren().remove(5);
+                root.getChildren().remove(4);
+                root.getChildren().remove(3);
+                root.getChildren().remove(2);
 
+                double angle = Math.toRadians(scroll2.getValue());
 
+                Matrix3 transform = new Matrix3(new double[] {
+                        1,0,0,
+                        0,Math.cos(angle),Math.sin(angle),
+                        0,-Math.sin(angle),Math.cos(angle)
+                });
+
+                for(int i = 0; i < tris.size(); i++){
+                    Triangle t = tris.get(i);
+                    t.v1 = transform.transform(t.v1);
+                    t.v2 = transform.transform(t.v2);
+                    t.v3 = transform.transform(t.v3);
+                    Path path = new Path();
+                    MoveTo moveto = new MoveTo();
+                    moveto.setX(t.v1.x+300);
+                    moveto.setY(t.v1.y+300);
+                    LineTo lineto1 = new LineTo();
+                    lineto1.setX(t.v2.x+300);
+                    lineto1.setY(t.v2.y+300);
+                    LineTo lineto2 = new LineTo();
+                    lineto2.setX(t.v3.x+300);
+                    lineto2.setY(t.v3.y+300);
+                    LineTo lineto3 = new LineTo();
+                    lineto3.setX(t.v1.x+300);
+                    lineto3.setY(t.v1.y+300);
+                    path.getElements().add(moveto);
+                    path.getElements().add(lineto1);
+                    path.getElements().add(lineto2);
+                    path.getElements().add(lineto3);
+                    root.getChildren().add(path);
+                }
+            }
+        });
 
         primaryStage.setScene(scene);
         primaryStage.show();
