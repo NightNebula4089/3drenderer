@@ -127,11 +127,18 @@ public class Main extends Application {
         Scene scene = new Scene(root, 600, 600, Color.WHITE);
         Stage primaryStage = new Stage();
 
+        double [][] z_buffer = new double[(int)scene.getWidth()][(int)scene.getHeight()];
+        for(int i = 0; i < (int)scene.getWidth(); i++){
+            for(int j = 0; j < (int)scene.getHeight(); j++){
+                z_buffer[i][j] = Double.NEGATIVE_INFINITY;
+            }
+        }
+
         ImageView renderedimg = new ImageView();
         WritableImage image = new WritableImage((int) scene.getHeight(), (int) scene.getWidth());
 
         for(Triangle trig : tris){
-            drawTriangle(trig,image);
+            drawTriangle(trig,image,z_buffer);
         }
 
         renderedimg.setImage(image);
@@ -141,6 +148,11 @@ public class Main extends Application {
             @Override
             public void changed(ObservableValue<? extends Number> observableValue, Number number, Number t1) {
                 eraseImage(image);
+                for(int i = 0; i < (int)scene.getWidth(); i++){
+                    for(int j = 0; j < (int)scene.getHeight(); j++){
+                        z_buffer[i][j] = Double.NEGATIVE_INFINITY;
+                    }
+                }
                 double angle = Math.toRadians(scroll.getValue());
                 Matrix3 transform = new Matrix3(new double[] {
                         Math.cos(angle),0,-Math.sin(angle),
@@ -153,7 +165,7 @@ public class Main extends Application {
                     t.v1 = transform.transform(t.v1);
                     t.v2 = transform.transform(t.v2);
                     t.v3 = transform.transform(t.v3);
-                    drawTriangle(t,image);
+                    drawTriangle(t,image,z_buffer);
                 }
             }
         });
@@ -162,6 +174,11 @@ public class Main extends Application {
             @Override
             public void changed(ObservableValue<? extends Number> observableValue, Number number, Number t1) {
                 eraseImage(image);
+                for(int i = 0; i < (int)scene.getWidth(); i++){
+                    for(int j = 0; j < (int)scene.getHeight(); j++){
+                        z_buffer[i][j] = Double.NEGATIVE_INFINITY;
+                    }
+                }
                 double angle = Math.toRadians(scroll2.getValue());
 
                 Matrix3 transform = new Matrix3(new double[] {
@@ -175,7 +192,7 @@ public class Main extends Application {
                     t.v1 = transform.transform(t.v1);
                     t.v2 = transform.transform(t.v2);
                     t.v3 = transform.transform(t.v3);
-                    drawTriangle(t,image);
+                    drawTriangle(t,image,z_buffer);
                 }
             }
         });
@@ -184,7 +201,7 @@ public class Main extends Application {
         primaryStage.show();
     }
 
-    public static boolean isIn(Triangle trig, int x, int y){
+    public static boolean isIn(Triangle trig, int x, int y,double[][] z_buffer){
         // v1(A) v2(B) v3(C)
         // PBC = det(v2 - (x,y); v3 - (x,y))
         // APC = det((x,y) - v1; v3 - v1)
@@ -195,13 +212,16 @@ public class Main extends Application {
         double b2 = ((x - trig.v1.x)*(trig.v3.y - trig.v1.y) - (y - trig.v1.y)*(trig.v3.x - trig.v1.x))/(trigarea);
         double b3 = ((trig.v2.x - trig.v1.x)*(y - trig.v1.y) - (trig.v2.y - trig.v1.y)*(x - trig.v1.x))/(trigarea);
         if (b1 <= 1 && b1 >= 0 && b2 <= 1 && b2 >= 0 && b3 <= 1 && b3 >= 0){
-            return true;
+            if(z_buffer[x][y] < b1*trig.v1.z + b2*trig.v2.z + b3*trig.v3.z){
+                z_buffer[x][y] = b1*trig.v1.z + b2*trig.v2.z + b3*trig.v3.z;
+                return true;
+            } else return false;
         } else {
             return false;
         }
     }
 
-    public void drawTriangle(Triangle trig, WritableImage image){
+    public void drawTriangle(Triangle trig, WritableImage image, double[][] z_buffer){
         Vertex v1 = trig.v1;
         Vertex v2 = trig.v2;
         Vertex v3 = trig.v3;
@@ -222,10 +242,11 @@ public class Main extends Application {
         int minY = (int) Math.max(0,Math.ceil(Math.min(y1,Math.min(y2,y3))));
         int maxY = (int) Math.min(image.getHeight()-1,Math.floor(Math.max(y1,Math.max(y2,y3))));
 
+
         for(int x = minX; x <= maxX; x++){
             for(int y = minY; y <= maxY; y++){
-                if(isIn(newtrig,x,y)){
-                    writer.setColor(x,y,trig.color);
+                if(isIn(newtrig,x,y,z_buffer)){
+                    writer.setColor(x, y, trig.color);
                 }
             }
         }
