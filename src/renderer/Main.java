@@ -10,6 +10,10 @@ import javafx.geometry.Orientation;
 import javafx.scene.Group;
 import javafx.scene.Scene;
 import javafx.scene.control.Slider;
+import javafx.scene.image.ImageView;
+import javafx.scene.image.PixelReader;
+import javafx.scene.image.PixelWriter;
+import javafx.scene.image.WritableImage;
 import javafx.scene.input.ScrollEvent;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.*;
@@ -120,40 +124,23 @@ public class Main extends Application {
         scroll2.setOrientation(Orientation.VERTICAL);
         root.getChildren().add(scroll2);
 
-        for(int i = 0; i < tris.size(); i++){
-            Triangle t = tris.get(i);
-            Path path = new Path();
-            MoveTo moveto = new MoveTo();
-            moveto.setX(t.v1.x+300);
-            moveto.setY(t.v1.y+300);
-            LineTo lineto1 = new LineTo();
-            lineto1.setX(t.v2.x+300);
-            lineto1.setY(t.v2.y+300);
-            LineTo lineto2 = new LineTo();
-            lineto2.setX(t.v3.x+300);
-            lineto2.setY(t.v3.y+300);
-            LineTo lineto3 = new LineTo();
-            lineto3.setX(t.v1.x+300);
-            lineto3.setY(t.v1.y+300);
-            path.getElements().add(moveto);
-            path.getElements().add(lineto1);
-            path.getElements().add(lineto2);
-            path.getElements().add(lineto3);
-            root.getChildren().add(path);
-        }
-
-
-
         Scene scene = new Scene(root, 600, 600, Color.WHITE);
         Stage primaryStage = new Stage();
+
+        ImageView renderedimg = new ImageView();
+        WritableImage image = new WritableImage((int) scene.getHeight(), (int) scene.getWidth());
+
+        for(Triangle trig : tris){
+            drawTriangle(trig,image);
+        }
+
+        renderedimg.setImage(image);
+        root.getChildren().add(renderedimg);
 
         scroll.valueProperty().addListener(new ChangeListener<Number>() {
             @Override
             public void changed(ObservableValue<? extends Number> observableValue, Number number, Number t1) {
-                root.getChildren().remove(5);
-                root.getChildren().remove(4);
-                root.getChildren().remove(3);
-                root.getChildren().remove(2);
+                eraseImage(image);
                 double angle = Math.toRadians(scroll.getValue());
                 Matrix3 transform = new Matrix3(new double[] {
                         Math.cos(angle),0,-Math.sin(angle),
@@ -166,24 +153,7 @@ public class Main extends Application {
                     t.v1 = transform.transform(t.v1);
                     t.v2 = transform.transform(t.v2);
                     t.v3 = transform.transform(t.v3);
-                    Path path = new Path();
-                    MoveTo moveto = new MoveTo();
-                    moveto.setX(t.v1.x+300);
-                    moveto.setY(t.v1.y+300);
-                    LineTo lineto1 = new LineTo();
-                    lineto1.setX(t.v2.x+300);
-                    lineto1.setY(t.v2.y+300);
-                    LineTo lineto2 = new LineTo();
-                    lineto2.setX(t.v3.x+300);
-                    lineto2.setY(t.v3.y+300);
-                    LineTo lineto3 = new LineTo();
-                    lineto3.setX(t.v1.x+300);
-                    lineto3.setY(t.v1.y+300);
-                    path.getElements().add(moveto);
-                    path.getElements().add(lineto1);
-                    path.getElements().add(lineto2);
-                    path.getElements().add(lineto3);
-                    root.getChildren().add(path);
+                    drawTriangle(t,image);
                 }
             }
         });
@@ -191,11 +161,7 @@ public class Main extends Application {
         scroll2.valueProperty().addListener(new ChangeListener<Number>() {
             @Override
             public void changed(ObservableValue<? extends Number> observableValue, Number number, Number t1) {
-                root.getChildren().remove(5);
-                root.getChildren().remove(4);
-                root.getChildren().remove(3);
-                root.getChildren().remove(2);
-
+                eraseImage(image);
                 double angle = Math.toRadians(scroll2.getValue());
 
                 Matrix3 transform = new Matrix3(new double[] {
@@ -209,30 +175,69 @@ public class Main extends Application {
                     t.v1 = transform.transform(t.v1);
                     t.v2 = transform.transform(t.v2);
                     t.v3 = transform.transform(t.v3);
-                    Path path = new Path();
-                    MoveTo moveto = new MoveTo();
-                    moveto.setX(t.v1.x+300);
-                    moveto.setY(t.v1.y+300);
-                    LineTo lineto1 = new LineTo();
-                    lineto1.setX(t.v2.x+300);
-                    lineto1.setY(t.v2.y+300);
-                    LineTo lineto2 = new LineTo();
-                    lineto2.setX(t.v3.x+300);
-                    lineto2.setY(t.v3.y+300);
-                    LineTo lineto3 = new LineTo();
-                    lineto3.setX(t.v1.x+300);
-                    lineto3.setY(t.v1.y+300);
-                    path.getElements().add(moveto);
-                    path.getElements().add(lineto1);
-                    path.getElements().add(lineto2);
-                    path.getElements().add(lineto3);
-                    root.getChildren().add(path);
+                    drawTriangle(t,image);
                 }
             }
         });
 
         primaryStage.setScene(scene);
         primaryStage.show();
+    }
+
+    public static boolean isIn(Triangle trig, int x, int y){
+        // v1(A) v2(B) v3(C)
+        // PBC = det(v2 - (x,y); v3 - (x,y))
+        // APC = det((x,y) - v1; v3 - v1)
+        // ABP = det (v2 - v1; (x,y) - v1)
+        // ABC = det(v3 - v1; v2 - v1)
+        double trigarea = (trig.v2.x - trig.v1.x)*(trig.v3.y - trig.v1.y) - (trig.v2.y-trig.v1.y)*(trig.v3.x - trig.v1.x);
+        double b1 = ((trig.v2.x - x)*(trig.v3.y - y) - (trig.v2.y - y)*(trig.v3.x - x))/(trigarea);
+        double b2 = ((x - trig.v1.x)*(trig.v3.y - trig.v1.y) - (y - trig.v1.y)*(trig.v3.x - trig.v1.x))/(trigarea);
+        double b3 = ((trig.v2.x - trig.v1.x)*(y - trig.v1.y) - (trig.v2.y - trig.v1.y)*(x - trig.v1.x))/(trigarea);
+        if (b1 <= 1 && b1 >= 0 && b2 <= 1 && b2 >= 0 && b3 <= 1 && b3 >= 0){
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    public void drawTriangle(Triangle trig, WritableImage image){
+        Vertex v1 = trig.v1;
+        Vertex v2 = trig.v2;
+        Vertex v3 = trig.v3;
+        PixelWriter writer = image.getPixelWriter();
+
+        double x1 = v1.x + image.getWidth()/2;
+        double y1 = v1.y + image.getHeight()/2;
+        double x2 = v2.x + image.getWidth()/2;
+        double y2 = v2.y + image.getHeight()/2;
+        double x3 = v3.x + image.getWidth()/2;
+        double y3 = v3.y + image.getHeight()/2;
+
+        Triangle newtrig = new Triangle(new Vertex(x1,y1,trig.v1.z),new Vertex(x2,y2,trig.v2.z),new Vertex(x3,y3,trig.v3.z),trig.color);
+
+        int minX = (int) Math.max(0,Math.ceil(Math.min(x1,Math.min(x2,x3))));
+        int maxX = (int) Math.min(image.getWidth()-1,Math.floor(Math.max(x1,Math.max(x2,x3))));
+
+        int minY = (int) Math.max(0,Math.ceil(Math.min(y1,Math.min(y2,y3))));
+        int maxY = (int) Math.min(image.getHeight()-1,Math.floor(Math.max(y1,Math.max(y2,y3))));
+
+        for(int x = minX; x <= maxX; x++){
+            for(int y = minY; y <= maxY; y++){
+                if(isIn(newtrig,x,y)){
+                    writer.setColor(x,y,trig.color);
+                }
+            }
+        }
+    }
+
+    public static void eraseImage(WritableImage image){
+        PixelWriter writer = image.getPixelWriter();
+        for(int i = 0; i < image.getWidth(); i++){
+            for(int j = 0; j < image.getHeight(); j++){
+                writer.setColor(i,j,Color.TRANSPARENT);
+            }
+        }
     }
 
     public static void main(String[] args){
